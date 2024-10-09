@@ -88,27 +88,28 @@ public static class AssemblyPublicizer
 
         if (options.HasTarget(PublicizeTarget.Fields))
         {
-            var eventNames = new HashSet<Utf8String?>(typeDefinition.Events.Select(e => e.Name));
+            var events = typeDefinition.Events.ToDictionary(e => e.Name, e => e);
             foreach (var fieldDefinition in typeDefinition.Fields)
             {
                 if (fieldDefinition.IsPrivateScope)
                     continue;
 
-                if (!fieldDefinition.IsPublic)
-                {
-                    // Skip event backing fields
-                    if (eventNames.Contains(fieldDefinition.Name))
-                        continue;
+                if (!options.PublicizeCompilerGenerated && fieldDefinition.IsCompilerGenerated())
+                    continue;
 
-                    if (!options.PublicizeCompilerGenerated && fieldDefinition.IsCompilerGenerated())
-                        continue;
+                fieldDefinition.IsInitOnly = false;
 
-                    if (attribute != null)
-                        fieldDefinition.CustomAttributes.Add(attribute.ToCustomAttribute(fieldDefinition.Attributes & FieldAttributes.FieldAccessMask));
+                if (events.TryGetValue(fieldDefinition.Name, out EventDefinition ev))
+                    ev.Name = "$" + ev.Name;
 
-                    fieldDefinition.Attributes &= ~FieldAttributes.FieldAccessMask;
-                    fieldDefinition.Attributes |= FieldAttributes.Public;
-                }
+                if (fieldDefinition.IsPublic)
+                    continue;
+
+                if (attribute != null)
+                    fieldDefinition.CustomAttributes.Add(attribute.ToCustomAttribute(fieldDefinition.Attributes & FieldAttributes.FieldAccessMask));
+
+                fieldDefinition.Attributes &= ~FieldAttributes.FieldAccessMask;
+                fieldDefinition.Attributes |= FieldAttributes.Public;
             }
         }
     }
